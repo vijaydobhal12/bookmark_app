@@ -19,7 +19,7 @@ export default function Home() {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
       if (!data.user) location.href = "/auth/login"
       else setUser(data.user)
     })
