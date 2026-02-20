@@ -36,6 +36,9 @@ export async function GET(request: Request) {
     console.log("Session exchange result:", { data: !!data, error })
 
     if (!error) {
+      // Small delay to ensure session is fully established before redirect
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       console.log("Session created successfully, redirecting to:", next)
       const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"
 import Loader from "@/app/components/Loader"
-import { Search, LogOut, Plus, Trash2, Link2, Bookmark, ExternalLink } from "lucide-react"
+import { Search, LogOut, Plus, Trash2, Link2, Bookmark, ExternalLink, User } from "lucide-react"
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -19,26 +19,49 @@ export default function Home() {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
-      if (!data.user) location.href = "/auth/login"
-      else setUser(data.user)
-    })
+    // Check for session with retry mechanism to handle race condition
+    const checkSession = async () => {
+      let attempts = 0
+      const maxAttempts = 3
+      
+      while (attempts < maxAttempts) {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user) {
+          setUser(session.user)
+          // Fetch bookmarks after user is set
+          fetchBookmarks(session.user.id)
+          return
+        }
+        
+        // If no session, wait a bit and retry (handles delayed session propagation)
+        if (attempts < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+        attempts++
+      }
+      
+      // If still no session after retries, redirect to login
+      if (typeof window !== 'undefined') {
+        window.location.href = "/auth/login"
+      }
+    }
 
-    fetchBookmarks()
+    checkSession()
 
     const channel = supabase
       .channel("bookmarks")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookmarks" },
-        fetchBookmarks
+        () => user && fetchBookmarks(user.id)
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -53,27 +76,68 @@ export default function Home() {
     }
   }, [searchQuery, bookmarks])
 
-  const fetchBookmarks = async () => {
+  const fetchBookmarks = async (userId?: string) => {
     setLoading(true)
-    const { data } = await supabase
+    const currentUserId = userId || user?.id
+    
+    let query = supabase
       .from("bookmarks")
       .select("*")
       .order("created_at", { ascending: false })
+    
+    // Filter by user_id if available (security - show only user's bookmarks)
+    if (currentUserId) {
+      query = query.eq("user_id", currentUserId)
+    }
+    
+    const { data, error } = await query
 
-    setBookmarks(data || [])
-    setFilteredBookmarks(data || [])
+    if (error) {
+      console.error("Error fetching bookmarks:", error)
+      setBookmarks([])
+      setFilteredBookmarks([])
+    } else {
+      setBookmarks(data || [])
+      setFilteredBookmarks(data || [])
+    }
     setLoading(false)
   }
 
   const addBookmark = async () => {
-    if (!url || !title) return
+    // Check if user is authenticated
+    if (!user) {
+      setSuccessMessage("Please log in to add bookmarks")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      return
+    }
+
+    if (!url || !title) {
+      setSuccessMessage("Please fill in both URL and title")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      return
+    }
 
     setSaving(true)
-    await supabase.from("bookmarks").insert({
+    console.log("Adding bookmark for user:", user.id)
+    
+    const { data, error } = await supabase.from("bookmarks").insert({
       url,
       title,
       user_id: user.id,
     })
+
+    console.log("Insert result:", { data, error })
+
+    if (error) {
+      console.error("Error adding bookmark:", error)
+      setSuccessMessage("Failed to add bookmark: " + error.message)
+      setTimeout(() => setSuccessMessage(""), 3000)
+    } else {
+      setSuccessMessage("Bookmark added successfully!")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      // Refresh bookmarks to show the new one
+      await fetchBookmarks()
+    }
 
     setUrl("")
     setTitle("")
@@ -90,7 +154,7 @@ export default function Home() {
 
   const logout = async () => {
     await supabase.auth.signOut()
-    location.href = "/auth/login"
+    window.location.href = "/auth/login"
   }
 
   const recentBookmarks = filteredBookmarks.slice(0, 5)
@@ -103,11 +167,34 @@ export default function Home() {
     }
   }
 
+  // Get user avatar URL and display name - check multiple sources for avatar
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || user?.user_metadata?.avatarUrl
+  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const initial = fullName.charAt(0).toUpperCase()
+
+  console.log("User metadata:", user?.user_metadata)
+  console.log("Avatar URL:", avatarUrl)
+
   return (
     <div className="page-container">
       <div className="header">
-        <h1 className="header-title">Bookmarks</h1>
+        <div className="header-left">
+          <h1 className="header-title">Bookmarks</h1>
+        </div>
         <div className="header-actions">
+          <div className="user-info" title={fullName}>
+            {avatarUrl ? (
+              <img 
+                src={avatarUrl} 
+                alt={fullName} 
+                className="user-avatar"
+              />
+            ) : (
+              <div className="user-avatar-fallback" title={fullName}>
+                {initial}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowSearch(!showSearch)}
             className={`icon-btn ${showSearch ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : ''}`}

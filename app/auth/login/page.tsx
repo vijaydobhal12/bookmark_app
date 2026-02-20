@@ -52,15 +52,16 @@ export default function Login() {
     setLoading(true)
     setError(null)
     
+    const redirectUrl = `${location.origin}/auth/callback`
     console.log("Starting Google OAuth login...")
-    console.log("Redirect URL:", `${location.origin}/auth/callback`)
-    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log("Redirect URL:", redirectUrl)
     
     try {
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false,
         },
       })
 
@@ -71,9 +72,14 @@ export default function Login() {
         return
       }
 
-      console.log("OAuth Response:", data)
+      // OAuth flow will redirect automatically
+      // If for some reason it doesn't redirect, reset loading after timeout
+      setTimeout(() => {
+        if (loading) {
+          setLoading(false)
+        }
+      }, 5000)
       
-      // Note: setLoading(false) may not execute because of redirect
     } catch (err) {
       console.error("Login Exception:", err)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")

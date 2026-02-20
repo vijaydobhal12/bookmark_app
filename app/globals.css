@@ -461,6 +461,12 @@ body {
   margin-bottom: 24px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-title {
   font-size: 28px;
   font-weight: 800;
@@ -474,6 +480,63 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* User Avatar */
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--card-border);
+  transition: all 0.2s ease;
+}
+
+.user-avatar:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+
+.user-avatar-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border: 2px solid var(--card-border);
+  transition: all 0.2s ease;
+}
+
+.user-avatar-fallback:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 400px) {
+  .user-name {
+    display: none;
+  }
 }
 
 /* Login Page Styles */
