@@ -6,6 +6,11 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
+  
+  console.log("=== Auth Callback ===")
+  console.log("Origin:", origin)
+  console.log("Code present:", !!code)
+  console.log("NEXT_PUBLIC_SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
 
   if (code) {
     const cookieStore = await cookies()
@@ -26,9 +31,12 @@ export async function GET(request: Request) {
       }
     )
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    console.log("Session exchange result:", { data: !!data, error })
 
     if (!error) {
+      console.log("Session created successfully, redirecting to:", next)
       const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'
 
@@ -39,9 +47,14 @@ export async function GET(request: Request) {
       } else {
         return NextResponse.redirect(`${origin}${next}`)
       }
+    } else {
+      console.error("Session exchange error:", error.message)
     }
+  } else {
+    console.error("No code provided in callback")
   }
 
   // Return to an error page if something goes wrong
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  console.log("Redirecting to error page")
+  return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`)
 }

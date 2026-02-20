@@ -2,7 +2,9 @@
 
 import { useState } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { Bookmark, Loader2 } from "lucide-react"
+import { Bookmark, Loader2, AlertCircle } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
 // Google SVG Icon Component
 function GoogleIcon() {
@@ -16,18 +18,67 @@ function GoogleIcon() {
   )
 }
 
+// Error Message Component (inline to avoid import issues)
+function ErrorMessageComponent() {
+  const searchParams = useSearchParams()
+  const error = searchParams.get("error")
+
+  if (!error) {
+    return null
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '12px',
+      backgroundColor: '#fee2e2',
+      borderRadius: '8px',
+      marginBottom: '16px',
+      color: '#dc2626'
+    }}>
+      <AlertCircle size={20} />
+      <span>Authentication failed. Please try again.</span>
+    </div>
+  )
+}
+
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const login = async () => {
     setLoading(true)
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${location.origin}/auth/callback`,
-      },
-    })
-    setLoading(false)
+    setError(null)
+    
+    console.log("Starting Google OAuth login...")
+    console.log("Redirect URL:", `${location.origin}/auth/callback`)
+    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    
+    try {
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${location.origin}/auth/callback`,
+        },
+      })
+
+      if (oauthError) {
+        console.error("OAuth Error:", oauthError)
+        setError(oauthError.message)
+        setLoading(false)
+        return
+      }
+
+      console.log("OAuth Response:", data)
+      
+      // Note: setLoading(false) may not execute because of redirect
+    } catch (err) {
+      console.error("Login Exception:", err)
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+      setLoading(false)
+    }
   }
 
   return (
@@ -40,6 +91,26 @@ export default function Login() {
           <h1 className="login-title">Bookmark App</h1>
           <p className="login-subtitle">Save and organize your favorite links</p>
         </div>
+
+        <Suspense fallback={null}>
+          <ErrorMessageComponent />
+        </Suspense>
+
+        {error && (
+          <div className="error-message" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px',
+            backgroundColor: '#fee2e2',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            color: '#dc2626'
+          }}>
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+        )}
 
         <button
           onClick={login}
