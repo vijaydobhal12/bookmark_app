@@ -12,8 +12,8 @@ export default function Saved() {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
+    supabase.auth.getUser().then(({ data, error }: any) => {
+      if (!data?.user) {
         window.location.href = "/auth/login"
       } else {
         setUser(data.user)
