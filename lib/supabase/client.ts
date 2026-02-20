@@ -12,7 +12,9 @@ const dummyFrom = () => ({
   }),
   insert: () => ({ error: null }),
   delete: () => ({
-    eq: () => ({ error: null }),
+    eq: () => ({
+      eq: () => ({ error: null }),
+    }),
   }),
 })
 

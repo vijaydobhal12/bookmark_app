@@ -118,15 +118,12 @@ export default function Home() {
     }
 
     setSaving(true)
-    console.log("Adding bookmark for user:", user.id)
     
     const { data, error } = await supabase.from("bookmarks").insert({
       url,
       title,
       user_id: user.id,
     })
-
-    console.log("Insert result:", { data, error })
 
     if (error) {
       console.error("Error adding bookmark:", error)
@@ -145,11 +142,39 @@ export default function Home() {
   }
 
   const removeBookmark = async (id: string) => {
+    // Check if user session exists
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error("Session error:", sessionError)
+      setSuccessMessage("Authentication error. Please log in again.")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      return
+    }
+    
+    if (!session?.user) {
+      console.warn("No user session found for delete operation")
+      setSuccessMessage("Please log in to delete bookmarks")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      return
+    }
+
     setDeleting(id)
-    await supabase.from("bookmarks").delete().eq("id", id)
+    
+    const { error } = await supabase.from("bookmarks").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting bookmark:", error)
+      setSuccessMessage("Failed to delete bookmark: " + error.message)
+      setTimeout(() => setSuccessMessage(""), 3000)
+    } else {
+      setSuccessMessage("Bookmark deleted successfully!")
+      setTimeout(() => setSuccessMessage(""), 3000)
+      // Refresh UI after successful deletion
+      await fetchBookmarks(session.user.id)
+    }
+    
     setDeleting(null)
-    setSuccessMessage("Bookmark deleted successfully!")
-    setTimeout(() => setSuccessMessage(""), 3000)
   }
 
   const logout = async () => {
@@ -171,9 +196,6 @@ export default function Home() {
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || user?.user_metadata?.avatarUrl
   const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
   const initial = fullName.charAt(0).toUpperCase()
-
-  console.log("User metadata:", user?.user_metadata)
-  console.log("Avatar URL:", avatarUrl)
 
   return (
     <div className="page-container">
